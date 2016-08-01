@@ -5,47 +5,79 @@ GFForms::include_feed_addon_framework();
 class GFCleverReach extends GFFeedAddOn {
 	
 	protected $_version = GF_CLEVERREACH_VERSION;
-	protected $_min_gravityforms_version = '1.9.8';
+	protected $_min_gravityforms_version = '1.9.14.26';
 	protected $_slug = 'gravityformscleverreach';
 	protected $_path = 'gravityformscleverreach/cleverreach.php';
 	protected $_full_path = __FILE__;
 	protected $_url = 'http://www.gravityforms.com';
 	protected $_title = 'Gravity Forms CleverReach Add-On';
 	protected $_short_title = 'CleverReach';
-
-	// Members plugin integration
-	protected $_capabilities = array( 'gravityforms_cleverreach', 'gravityforms_cleverreach_uninstall' );
-
-	// Permissions
-	protected $_capabilities_settings_page = 'gravityforms_cleverreach';
-	protected $_capabilities_form_settings = 'gravityforms_cleverreach';
-	protected $_capabilities_uninstall = 'gravityforms_cleverreach_uninstall';
 	protected $_enable_rg_autoupgrade = true;
-
 	protected $api = null;
 	protected $api_key = null;
 	protected $api_url = 'http://api.cleverreach.com/soap/interface_v5.1.php?wsdl';
 	protected $_new_custom_fields = array();
 	private static $_instance = null;
 
+	/* Permissions */
+	protected $_capabilities_settings_page = 'gravityforms_cleverreach';
+	protected $_capabilities_form_settings = 'gravityforms_cleverreach';
+	protected $_capabilities_uninstall = 'gravityforms_cleverreach_uninstall';
+
+	/* Members plugin integration */
+	protected $_capabilities = array( 'gravityforms_cleverreach', 'gravityforms_cleverreach_uninstall' );
+
+	/**
+	 * Get instance of this class.
+	 * 
+	 * @access public
+	 * @static
+	 * @return $_instance
+	 */	
 	public static function get_instance() {
 		
-		if ( self::$_instance == null )
-			self::$_instance = new GFCleverReach();
+		if ( self::$_instance == null ) {
+			self::$_instance = new self;
+		}
 
 		return self::$_instance;
 		
 	}
 
-	/* Setup plugin settings page */
+	/**
+	 * Register needed plugin hooks and PayPal delayed payment support.
+	 * 
+	 * @access public
+	 * @return void
+	 */
+	public function init() {
+		
+		parent::init();
+		
+		$this->add_delayed_payment_support(
+			array(
+				'option_label' => esc_html__( 'Subscribe contact to CleverReach only when payment is received.', 'gravityformscleverreach' )
+			)
+		);
+		
+	}
+
+	/**
+	 * Display warning message on plugin settings page when SOAP extension is not loaded.
+	 * 
+	 * @access public
+	 * @return void
+	 */
 	public function plugin_settings_page() {
 		
-		if ( extension_loaded( 'soap' ) )
+		if ( extension_loaded( 'soap' ) ) {
 			return parent::plugin_settings_page();
+		}
 		
 		$icon = $this->plugin_settings_icon();
-		if ( empty( $icon ) )
+		if ( empty( $icon ) ) {
 			$icon = '<i class="fa fa-cogs"></i>';
+		}
 
 		echo '<h3><span>'. $icon .' '. $this->plugin_settings_title() .'</span></h3>';
 		echo '<p>' . __( 'Gravity Forms CleverReach Add-On requires the PHP Soap extension to be able to communicate with CleverReach.', 'gravityformscleverreach' ) . '</p>';
@@ -53,7 +85,12 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 
-	/* Setup plugin settings fields */
+	/**
+	 * Prepare settings to be rendered on plugin settings tab.
+	 * 
+	 * @access public
+	 * @return array
+	 */
 	public function plugin_settings_fields() {
 		
 		return array(
@@ -80,7 +117,12 @@ class GFCleverReach extends GFFeedAddOn {
 
 	}
 
-	/* Prepare plugin settings description */
+	/**
+	 * Prepare plugin settings description.
+	 * 
+	 * @access public
+	 * @return string $description
+	 */
 	public function plugin_settings_description() {
 		
 		$description  = '<p>';
@@ -102,7 +144,12 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 	
-	/* Setup feed settings fields */
+	/**
+	 * Prepare settings to be rendered on feed settings tab.
+	 * 
+	 * @access public
+	 * @return array $fields - The feed settings fields
+	 */
 	public function feed_settings_fields() {
 		
 		$fields = array(
@@ -179,7 +226,14 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 
-	/* Fork of maybe_save_feed_settings to create new CleverReach custom fields */
+	/**
+	 * Fork of maybe_save_feed_settings to create new CleverReach custom fields.
+	 * 
+	 * @access public
+	 * @param int $feed_id - The ID of the feed being edited
+	 * @param int $form_id - The ID of the current form
+	 * @return int $feed_id 
+	 */
 	public function maybe_save_feed_settings( $feed_id, $form_id ) {
 
 		if ( ! rgpost( 'gform-settings-save' ) ) {
@@ -214,7 +268,58 @@ class GFCleverReach extends GFFeedAddOn {
 		return $feed_id;
 	}
 
-	/* Prepare groups for feed setting */
+	/**
+	 * Prepare CleverReach forms for feed settings field.
+	 * 
+	 * @access public
+	 * @return array - An array of CleverReach forms formatted for a select settings field
+	 */
+	public function forms_for_feed_setting() {
+		
+		$forms = array(
+			array(
+				'label' => __( 'Choose a Double Opt-In Form', 'gravityformscleverreach' ),
+				'value' => ''
+			)
+		);
+
+		/* If CleverReach API credentials are invalid, return the forms array. */
+		if ( ! $this->initialize_api() ) {
+			return $forms;
+		}
+			
+		/* Get list ID. */
+		$current_feed = $this->get_current_feed();
+		$group_id = rgpost( '_gaddon_setting_group' ) ? rgpost( '_gaddon_setting_group' ) : $current_feed['meta']['group'] ;
+		
+		/* Get available CleverReach forms. */
+		$cr_forms = $this->api->formsGetList( $this->api_key, $group_id );
+		
+		/* Add CleverReach forms to array and return it. */
+		if ( ! empty( $cr_forms->data ) ) {
+			
+			foreach ( $cr_forms->data as $form ) {
+				
+				$forms[] = array(
+					'label' => $form->name,
+					'value' => $form->id
+				);
+				
+			}
+			
+		}
+		
+		return $forms;
+
+		
+	}
+
+	/**
+	 * Prepare CleverReach groups for feed settings field.
+	 * 
+	 * @access public
+	 * @return array - An array of CleverReach groups formatted for a select settings field
+	 */
 	public function groups_for_feed_setting() {
 		
 		$groups = array(
@@ -248,15 +353,21 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 
-	/* Prepare custom fields for feed setting */
+	/**
+	 * Prepare CleverReach custom fields for feed settings field.
+	 * 
+	 * @access public
+	 * @return array - An array of CleverReach custom fields formatted for a select settings field
+	 */
 	public function custom_fields_for_feed_setting() {
 		
 		/* Setup choices array. */
 		$choices = array();
 		
 		/* If API isn't initialized, return the choices array. */
-		if ( ! $this->initialize_api() )
+		if ( ! $this->initialize_api() ) {
 			return $choices;		
+		}
 		
 		/* Get current group ID */
 		$feed = $this->get_current_feed();
@@ -266,8 +377,9 @@ class GFCleverReach extends GFFeedAddOn {
 		$group = $this->api->groupGetDetails( $this->api_key, $group_id );
 		
 		/* If request failed, return the choices array. */
-		if ( $group->statuscode == 1 )
+		if ( $group->statuscode == 1 ) {
 			return $choices;
+		}
 		
 		/* Get the global and group attributes */
 		$attributes = array_merge( $group->data->attributes, $group->data->globalAttributes );
@@ -310,31 +422,40 @@ class GFCleverReach extends GFFeedAddOn {
 		}
 
 		/* Add "Add Custom Field" to array. */
-		if ( count( $choices ) > 0 )
+		if ( count( $choices ) > 0 ) {
 			$choices[] = array(
 				'label' => __( 'Add Custom Field', 'gravityformscleverreach' ),
 				'value' => 'gf_custom'	
-			);		
+			);
+		}
 
 		return $choices;
 		
 	}
 
-	/* Create new CleverReach custom fields */
+	/**
+	 * Create new CleverReach custom fields when feed settings are saved.
+	 * 
+	 * @access public
+	 * @param array $settings - The feed settings
+	 * @return array $settings - The feed settings
+	 */
 	public function create_new_custom_fields( $settings ) {
 
 		global $_gaddon_posted_settings;
 
 		/* If no custom fields are set or if the API credentials are invalid, return settings. */
-		if ( empty( $settings['custom_fields'] ) || ! $this->initialize_api() )
+		if ( empty( $settings['custom_fields'] ) || ! $this->initialize_api() ) {
 			return $settings;
+		}
 	
 		/* Loop through each custom field. */
 		foreach ( $settings['custom_fields'] as $index => &$field ) {
 			
 			/* If no custom key is set, move on. */
-			if ( rgblank( $field['custom_key'] ) )
+			if ( rgblank( $field['custom_key'] ) ) {
 				continue;
+			}
 				
 			/* Add new field. */
 			$new_field = $this->api->groupAttributeAdd( $this->api_key, 0, $field['custom_key'], 'text' );
@@ -362,47 +483,12 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 
-	/* Prepare CleverReach forms for feed field */
-	public function forms_for_feed_setting() {
-		
-		$forms = array(
-			array(
-				'label' => __( 'Choose a Double Opt-In Form', 'gravityformscleverreach' ),
-				'value' => ''
-			)
-		);
-
-		/* If CleverReach API credentials are invalid, return the forms array. */
-		if ( ! $this->initialize_api() )
-			return $forms;
-			
-		/* Get list ID. */
-		$current_feed = $this->get_current_feed();
-		$group_id = rgpost( '_gaddon_setting_group' ) ? rgpost( '_gaddon_setting_group' ) : $current_feed['meta']['group'] ;
-		
-		/* Get available CleverReach forms. */
-		$cr_forms = $this->api->formsGetList( $this->api_key, $group_id );
-		
-		/* Add CleverReach forms to array and return it. */
-		if ( ! empty( $cr_forms->data ) ) {
-			
-			foreach ( $cr_forms->data as $form ) {
-				
-				$forms[] = array(
-					'label' => $form->name,
-					'value' => $form->id
-				);
-				
-			}
-			
-		}
-		
-		return $forms;
-
-		
-	}
-
-	/* Setup feed list columns */
+	/**
+	 * Configures which columns should be displayed on the feed list page.
+	 * 
+	 * @access public
+	 * @return array
+	 */
 	public function feed_list_columns() {
 		
 		return array(
@@ -412,7 +498,13 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 	
-	/* Change value of group feed column to group name */
+	/**
+	 * Returns the value to be displayed in the group name column.
+	 * 
+	 * @access public
+	 * @param array $feed The feed being included in the feed list.
+	 * @return string
+	 */
 	public function get_column_value_group( $feed ) {
 			
 		/* If CleverReach instance is not initialized, return group ID. */
@@ -425,52 +517,47 @@ class GFCleverReach extends GFFeedAddOn {
 		
 	}
 
-	/* Hide "Add New" feed button if API credentials are invalid */		
-	public function feed_list_title() {
+	/**
+	 * Set feed creation control.
+	 *
+	 * @access public
+	 * @return bool
+	 */
+	public function can_create_feed() {
+
+		return $this->initialize_api();
+
+	}
+
+	/**
+	 * Enable feed duplication.
+	 * 
+	 * @access public
+	 * @return bool
+	 */
+	public function can_duplicate_feed() {
 		
-		if ( $this->initialize_api() )
-			return parent::feed_list_title();
-			
-		return sprintf( __( '%s Feeds', 'gravityforms' ), $this->get_short_title() );
+		return true;
 		
 	}
 
-	/* Notify user to configure add-on before setting up feeds */
-	public function feed_list_message() {
-
-		$message = parent::feed_list_message();
-		
-		if ( $message !== false )
-			return $message;
-
-		if ( ! $this->initialize_api() )
-			return $this->configure_addon_message();
-
-		return false;
-		
-	}
-	
-	/* Feed list message for user to configure add-on */
-	public function configure_addon_message() {
-		
-		$settings_label = sprintf( __( '%s Settings', 'gravityforms' ), $this->get_short_title() );
-		$settings_link  = sprintf( '<a href="%s">%s</a>', esc_url( $this->get_plugin_settings_url() ), $settings_label );
-
-		return sprintf( __( 'To get started, please configure your %s.', 'gravityformscleverreach' ), $settings_link );
-		
-	}
-
-	/* Process feed */
+	/**
+	 * Processes the feed, subscribe the user to the list.
+	 * 
+	 * @access public
+	 * @param array $feed The feed object to be processed.
+	 * @param array $entry The entry object currently being processed.
+	 * @param array $form The form object currently being processed.
+	 * @return void
+	 */
 	public function process_feed( $feed, $entry, $form ) {
 		
 		$this->log_debug( __METHOD__ . '(): Processing feed.' );
 		
 		/* If API instance is not initialized, exit. */
 		if ( ! $this->initialize_api() ) {
-			
 			$this->log_error( __METHOD__ . '(): Failed to set up the API.' );
 			return;
-			
 		}
 		
 		/* Setup contact array. */
@@ -485,13 +572,15 @@ class GFCleverReach extends GFFeedAddOn {
 			
 			foreach ( $feed['meta']['custom_fields'] as $field ) {
 				
-				if ( rgblank( $field['value'] ) || $field['key'] == 'gf_custom' )
+				if ( rgblank( $field['value'] ) || $field['key'] == 'gf_custom' ) {
 					continue;
+				}
 					
 				$field_value = $this->get_field_value( $form, $entry, $field['value'] );
 				
-				if ( rgblank( $field_value ) )
+				if ( rgblank( $field_value ) ) {
 					continue;
+				}
 				
 				$contact['attributes'][] = array(
 					'key'   => $field['key'],
@@ -536,8 +625,9 @@ class GFCleverReach extends GFFeedAddOn {
 			
 			/* Add additional needed information. */
 			$contact['registered'] = time();
-			if ( ! $feed['meta']['double_optin_form'] )
+			if ( ! $feed['meta']['double_optin_form'] ) {
 				$contact['activated'] = time();
+			}
 			
 			/* Add the contact. */
 			$add_contact = $this->api->receiverAdd( $this->api_key, $feed['meta']['group'], $contact );
@@ -600,23 +690,31 @@ class GFCleverReach extends GFFeedAddOn {
 
 	}
 
-	/* Checks validity of CleverReach API credentials and initializes API if valid. */
+	/**
+	 * Initializes CleverReach API if credentials are valid.
+	 * 
+	 * @access public
+	 * @return bool|null
+	 */
 	public function initialize_api() {
 
-		if ( ! extension_loaded( 'soap' ) )
+		if ( ! extension_loaded( 'soap' ) ) {
 			return false;
+		}
 
-		if ( ! is_null( $this->api ) )
+		if ( ! is_null( $this->api ) ) {
 			return true;
+		}
 		
 		/* Get the plugin settings */
 		$settings = $this->get_plugin_settings();
 		
 		/* If the API Key is empty, return null. */
-		if ( rgblank( $settings['api_key'] ) )
+		if ( rgblank( $settings['api_key'] ) ) {
 			return null;
+		}
 			
-		$this->log_debug( __METHOD__ . "(): Validating API info for {$settings['api_key']}." );
+		$this->log_debug( __METHOD__ . "(): Validating API info." );
 		
 		/* Setup a new CleverReach API object. */
 		$cleverreach = new SoapClient( $this->api_url );

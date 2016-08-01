@@ -1,9 +1,12 @@
 -----------------------------------------------------------
-1.1
-	- Added Double Opt-In support.
+1.2
+	- Added feed duplication support.
+    - Added gf_cleverreach() for easily getting a CleverReach instance.
+	- Added support for delaying feed processing until payment by PayPal Standard is successfully completed.
 
 -----------------------------------------------------------
-1.0.1
+1.1
+	- Added Double Opt-In support.
 	- Added Spanish (es_ES) translation.
   
 -----------------------------------------------------------

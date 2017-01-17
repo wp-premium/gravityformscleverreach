@@ -1,4 +1,11 @@
 -----------------------------------------------------------
+1.3
+	- Updated warning message when SOAP extension is not present.
+	- Fixed strings for translations.
+    - Fixed fatal error which could occur when initiating the CleverReach API.
+    - Fixed PHP notice.
+
+-----------------------------------------------------------
 1.2
 	- Added feed duplication support.
     - Added gf_cleverreach() for easily getting a CleverReach instance.

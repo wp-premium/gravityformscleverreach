@@ -80,8 +80,8 @@ class GFCleverReach extends GFFeedAddOn {
 		}
 
 		echo '<h3><span>'. $icon .' '. $this->plugin_settings_title() .'</span></h3>';
-		echo '<p>' . __( 'Gravity Forms CleverReach Add-On requires the PHP Soap extension to be able to communicate with CleverReach.', 'gravityformscleverreach' ) . '</p>';
-		echo '<p>' . __( 'To continue using this Add-On, please enable the Soap extension.', 'gravityformscleverreach' ) . '</p>';
+		echo '<p>' . __( 'Gravity Forms CleverReach Add-On requires the <a href="http://php.net/manual/en/book.soap.php">PHP Soap extension</a> to be able to communicate with CleverReach.' , 'gravityformscleverreach' ) . '</p>';
+		echo '<p>' . __( 'To continue using this Add-On, please enable the Soap extension. For information on doing so, contact your hosting provider.', 'gravityformscleverreach' ) . '</p>';
 		
 	}
 
@@ -127,7 +127,7 @@ class GFCleverReach extends GFFeedAddOn {
 		
 		$description  = '<p>';
 		$description .= sprintf(
-			__( 'CleverReach makes it easy to send email newsletters to your customers, manage your subscriber lists, and track campaign performance. Use Gravity Forms to collect customer information and automatically add them to your CleverReach group. If you don\'t have a CleverReach account, you can %1$s sign up for one here.%2$s', 'gravityformscleverreach' ),
+			__( 'CleverReach makes it easy to send email newsletters to your customers, manage your subscriber lists, and track campaign performance. Use Gravity Forms to collect customer information and automatically add it to your CleverReach group. If you don\'t have a CleverReach account, you can %1$ssign up for one here.%2$s', 'gravityformscleverreach' ),
 			'<a href="http://www.cleverreach.com/" target="_blank">', '</a>'
 		);
 		$description .= '</p>';
@@ -533,9 +533,12 @@ class GFCleverReach extends GFFeedAddOn {
 	 * Enable feed duplication.
 	 * 
 	 * @access public
+	 *
+	 * @param int|array $id The ID of the feed to be duplicated or the feed object when duplicating a form.
+	 *
 	 * @return bool
 	 */
-	public function can_duplicate_feed() {
+	public function can_duplicate_feed( $id ) {
 		
 		return true;
 		
@@ -718,33 +721,38 @@ class GFCleverReach extends GFFeedAddOn {
 		
 		/* Setup a new CleverReach API object. */
 		$cleverreach = new SoapClient( $this->api_url );
-		
-		/* Run a test request. */
-		$api_test = $cleverreach->clientGetDetails( $settings['api_key'] );
-		
-		if ( $api_test->statuscode == 0 ) {
-			
-			/* Assign API object to class. */
-			$this->api = $cleverreach;
-			
-			/* Assign API Key to class. */
-			$this->api_key = $settings['api_key'];
-			
-			/* Log that test passed. */
-			$this->log_debug( __METHOD__ . '(): API credentials are valid.' );
-						
-			return true;
-			
-		} else {
-			
-			/* Log that test failed. */
-			$this->log_error( __METHOD__ . '(): API credentials are invalid; '. $api_test->message );			
+
+		try {
+			/* Run a test request. */
+			$api_test = $cleverreach->clientGetDetails( $settings['api_key'] );
+
+			if ( $api_test->statuscode == 0 ) {
+
+				/* Assign API object to class. */
+				$this->api = $cleverreach;
+
+				/* Assign API Key to class. */
+				$this->api_key = $settings['api_key'];
+
+				/* Log that test passed. */
+				$this->log_debug( __METHOD__ . '(): API credentials are valid.' );
+
+				return true;
+
+			} else {
+
+				/* Log that test failed. */
+				$this->log_error( __METHOD__ . '(): API credentials are invalid; ' . $api_test->message );
+
+				return false;
+
+			}
+		} catch ( Exception $e ) {
+			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
 
 			return false;
-			
 		}
 		
 	}
-
 
 }

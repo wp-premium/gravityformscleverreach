@@ -1,12 +1,18 @@
 <?php
-	
-/*
+
+// don't load directly
+if ( ! defined( 'ABSPATH' ) ) {
+	die();
+}
+
+/**
 Plugin Name: Gravity Forms CleverReach Add-On
-Plugin URI: http://www.gravityforms.com
+Plugin URI: https://www.gravityforms.com
 Description: Integrates Gravity Forms with CleverReach, allowing form submissions to be automatically sent to your CleverReach account.
-Version: 1.3
+Version: 1.4
 Author: rocketgenius
-Author URI: http://www.rocketgenius.com
+Author URI: https://www.rocketgenius.com
+License: GPL-2.0+
 Text Domain: gravityformscleverreach
 Domain Path: /languages
 
@@ -29,19 +35,45 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-define( 'GF_CLEVERREACH_VERSION', '1.3' );
+define( 'GF_CLEVERREACH_VERSION', '1.4' );
 
+// If Gravity Forms is loaded, bootstrap the CleverReach Add-On.
 add_action( 'gform_loaded', array( 'GF_CleverReach_Bootstrap', 'load' ), 5 );
 
+/**
+ * Class GF_CleverReach_Bootstrap
+ *
+ * Handles the loading of the CleverReach Add-On and registers with the Add-On framework.
+ */
 class GF_CleverReach_Bootstrap {
 
+	/**
+	 * If the Add-On Framework exists, CleverReach Add-On is loaded.
+	 *
+	 * @access public
+	 * @static
+	 */
 	public static function load(){
+
+		if ( ! method_exists( 'GFForms', 'include_addon_framework' ) ) {
+			return;
+		}
+
 		require_once( 'class-gf-cleverreach.php' );
+
 		GFAddOn::register( 'GFCleverReach' );
+
 	}
-	
+
 }
 
+/**
+ * Returns an instance of the GFCleverReach class
+ *
+ * @see    GFCleverReach::get_instance()
+ *
+ * @return object GFCleverReach
+ */
 function gf_cleverreach() {
-	return GFCleverReach::get_instance();	
+	return GFCleverReach::get_instance();
 }

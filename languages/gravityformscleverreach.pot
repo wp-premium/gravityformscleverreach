@@ -1,13 +1,13 @@
-# Copyright 2009-2018 Rocketgenius, Inc.
+# Copyright 2009-2019 Rocketgenius, Inc.
 msgid ""
 msgstr ""
-"Project-Id-Version: Gravity Forms CleverReach Add-On 1.4\n"
-"Report-Msgid-Bugs-To: http://www.gravtiyhelp.com\n"
-"POT-Creation-Date: 2018-04-12 16:05:23+00:00\n"
+"Project-Id-Version: Gravity Forms CleverReach Add-On 1.5\n"
+"Report-Msgid-Bugs-To: https://www.gravtiyforms.com\n"
+"POT-Creation-Date: 2019-02-19 12:40:19+00:00\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"PO-Revision-Date: 2018-MO-DA HO:MI+ZONE\n"
+"PO-Revision-Date: 2019-MO-DA HO:MI+ZONE\n"
 "Last-Translator: Rocketgenius <customerservice@rocketgenius.com>\n"
 "Language-Team: Rocketgenius <customerservice@rocketgenius.com>\n"
 "X-Generator: Gravity Forms Build Server\n"
@@ -24,31 +24,11 @@ msgstr ""
 "X-Poedit-SourceCharset: utf-8\n"
 "X-Textdomain-Support: yes\n"
 
-#: class-gf-cleverreach.php:213
+#: class-gf-cleverreach.php:201 includes/class-gf-cleverreach-legacy.php:215
 msgid "Subscribe contact to CleverReach only when payment is received."
 msgstr ""
 
-#: class-gf-cleverreach.php:256
-msgid ""
-"Gravity Forms CleverReach Add-On requires the %sPHP Soap extension%s to be "
-"able to communicate with CleverReach."
-msgstr ""
-
-#: class-gf-cleverreach.php:259
-msgid ""
-"To continue using this Add-On, please enable the Soap extension. For "
-"information on doing so, contact your hosting provider."
-msgstr ""
-
-#: class-gf-cleverreach.php:282
-msgid "API Key"
-msgstr ""
-
-#: class-gf-cleverreach.php:290
-msgid "CleverReach settings have been updated."
-msgstr ""
-
-#: class-gf-cleverreach.php:315
+#: class-gf-cleverreach.php:230 includes/class-gf-cleverreach-legacy.php:348
 msgid ""
 "CleverReach makes it easy to send email newsletters to your customers, "
 "manage your subscriber lists, and track campaign performance. Use Gravity "
@@ -57,98 +37,127 @@ msgid ""
 "%1$ssign up for one here.%2$s"
 msgstr ""
 
-#: class-gf-cleverreach.php:325
-msgid ""
-"Gravity Forms CleverReach Add-On requires an API Key, with reading and "
-"writing authorization, which can be found on the API page under the Extras "
-"menu in your account settings."
+#: class-gf-cleverreach.php:242 includes/class-gf-cleverreach-legacy.php:303
+msgid "Customer ID"
 msgstr ""
 
-#: class-gf-cleverreach.php:361
+#: class-gf-cleverreach.php:249 includes/class-gf-cleverreach-legacy.php:309
+msgid "Username"
+msgstr ""
+
+#: class-gf-cleverreach.php:256 includes/class-gf-cleverreach-legacy.php:315
+msgid "Password"
+msgstr ""
+
+#: class-gf-cleverreach.php:265 includes/class-gf-cleverreach-legacy.php:323
+msgid "CleverReach settings have been updated."
+msgstr ""
+
+#: class-gf-cleverreach.php:383 includes/class-gf-cleverreach-legacy.php:394
 msgid "Feed Name"
 msgstr ""
 
-#: class-gf-cleverreach.php:366 class-gf-cleverreach.php:866
+#: class-gf-cleverreach.php:390 class-gf-cleverreach.php:912
+#: includes/class-gf-cleverreach-legacy.php:399
+#: includes/class-gf-cleverreach-legacy.php:899
 msgid "Name"
 msgstr ""
 
-#: class-gf-cleverreach.php:367
+#: class-gf-cleverreach.php:391 includes/class-gf-cleverreach-legacy.php:400
 msgid "Enter a feed name to uniquely identify this setup."
 msgstr ""
 
-#: class-gf-cleverreach.php:372 class-gf-cleverreach.php:379
-#: class-gf-cleverreach.php:867
+#: class-gf-cleverreach.php:396 class-gf-cleverreach.php:403
+#: class-gf-cleverreach.php:913 includes/class-gf-cleverreach-legacy.php:405
+#: includes/class-gf-cleverreach-legacy.php:412
+#: includes/class-gf-cleverreach-legacy.php:900
 msgid "CleverReach Group"
 msgstr ""
 
-#: class-gf-cleverreach.php:380
+#: class-gf-cleverreach.php:404 includes/class-gf-cleverreach-legacy.php:413
 msgid "Select which CleverReach group this feed will add contacts to."
 msgstr ""
 
-#: class-gf-cleverreach.php:385 class-gf-cleverreach.php:392
+#: class-gf-cleverreach.php:409 class-gf-cleverreach.php:416
+#: includes/class-gf-cleverreach-legacy.php:418
+#: includes/class-gf-cleverreach-legacy.php:425
 msgid "Email Field"
 msgstr ""
 
-#: class-gf-cleverreach.php:393
+#: class-gf-cleverreach.php:417 includes/class-gf-cleverreach-legacy.php:426
 msgid "Select which Gravity Form field will be used as the subscriber email."
 msgstr ""
 
-#: class-gf-cleverreach.php:398 class-gf-cleverreach.php:404
+#: class-gf-cleverreach.php:422 class-gf-cleverreach.php:428
+#: includes/class-gf-cleverreach-legacy.php:431
+#: includes/class-gf-cleverreach-legacy.php:437
 msgid "Custom Fields"
 msgstr ""
 
-#: class-gf-cleverreach.php:405
+#: class-gf-cleverreach.php:429 includes/class-gf-cleverreach-legacy.php:438
 msgid ""
 "Select or create a new CleverReach custom field to pair with Gravity Forms "
 "fields."
 msgstr ""
 
-#: class-gf-cleverreach.php:410 class-gf-cleverreach.php:417
+#: class-gf-cleverreach.php:434 class-gf-cleverreach.php:441
+#: includes/class-gf-cleverreach-legacy.php:443
+#: includes/class-gf-cleverreach-legacy.php:450
 msgid "Opt-In Condition"
 msgstr ""
 
-#: class-gf-cleverreach.php:413
+#: class-gf-cleverreach.php:437 includes/class-gf-cleverreach-legacy.php:446
 msgid "Enable"
 msgstr ""
 
-#: class-gf-cleverreach.php:414
+#: class-gf-cleverreach.php:438 includes/class-gf-cleverreach-legacy.php:447
 msgid "Export to CleverReach if"
 msgstr ""
 
-#: class-gf-cleverreach.php:418
+#: class-gf-cleverreach.php:442 includes/class-gf-cleverreach-legacy.php:451
 msgid ""
 "When the opt-in condition is enabled, form submissions will only be "
 "exported to CleverReach when the condition is met. When disabled, all form "
 "submissions will be exported."
 msgstr ""
 
-#: class-gf-cleverreach.php:437 class-gf-cleverreach.php:443
+#: class-gf-cleverreach.php:460 class-gf-cleverreach.php:466
+#: includes/class-gf-cleverreach-legacy.php:470
+#: includes/class-gf-cleverreach-legacy.php:476
 msgid "Double Opt-In Form"
 msgstr ""
 
-#: class-gf-cleverreach.php:444
+#: class-gf-cleverreach.php:467 includes/class-gf-cleverreach-legacy.php:477
 msgid ""
 "Select which CleverReach form will be used when exporting to CleverReach to "
 "send the opt-in email."
 msgstr ""
 
-#: class-gf-cleverreach.php:526
+#: class-gf-cleverreach.php:515
+msgid "You don't have sufficient permissions to update the form settings."
+msgstr ""
+
+#: class-gf-cleverreach.php:576 includes/class-gf-cleverreach-legacy.php:559
 msgid "Choose a Double Opt-In Form"
 msgstr ""
 
-#: class-gf-cleverreach.php:593
+#: class-gf-cleverreach.php:644 includes/class-gf-cleverreach-legacy.php:626
 msgid "Choose a CleverReach Group"
 msgstr ""
 
-#: class-gf-cleverreach.php:680
+#: class-gf-cleverreach.php:736 includes/class-gf-cleverreach-legacy.php:713
 msgid "Select a Custom Field"
 msgstr ""
 
-#: class-gf-cleverreach.php:733
+#: class-gf-cleverreach.php:763 includes/class-gf-cleverreach-legacy.php:766
 msgid "Add Custom Field"
 msgstr ""
 
-#: class-gf-cleverreach.php:924
+#: class-gf-cleverreach.php:949
+msgid "Group not found"
+msgstr ""
+
+#: class-gf-cleverreach.php:990 includes/class-gf-cleverreach-legacy.php:957
 msgid "Unable to process feed because API was not initialized."
 msgstr ""
 
@@ -156,12 +165,41 @@ msgstr ""
 msgid "Gravity Forms CleverReach Add-On"
 msgstr ""
 
-#: class-gf-cleverreach.php:937
+#: class-gf-cleverreach.php:1004 includes/class-gf-cleverreach-legacy.php:970
 msgid "Unable to process feed because an invalid email address was provided."
 msgstr ""
 
-#: class-gf-cleverreach.php:978
+#: class-gf-cleverreach.php:1064 includes/class-gf-cleverreach-legacy.php:1011
 msgid "Unable to determine if contact exists."
+msgstr ""
+
+#: class-gf-cleverreach.php:1107
+msgid "Unable to add or update contact; %s (%d)"
+msgstr ""
+
+#: includes/class-gf-cleverreach-legacy.php:231
+msgid ""
+"CleverReach's SOAP API has been deprecated. %sPlease update your "
+"CleverReach credentials to use their current REST API.%s"
+msgstr ""
+
+#: includes/class-gf-cleverreach-legacy.php:277
+msgid ""
+"Gravity Forms CleverReach Add-On requires the %sPHP Soap extension%s to be "
+"able to communicate with CleverReach."
+msgstr ""
+
+#: includes/class-gf-cleverreach-legacy.php:280
+msgid ""
+"To continue using this Add-On, please enable the Soap extension. For "
+"information on doing so, contact your hosting provider."
+msgstr ""
+
+#: includes/class-gf-cleverreach-legacy.php:358
+msgid ""
+"Gravity Forms CleverReach Add-On requires an API Key, with reading and "
+"writing authorization, which can be found on the API page under the Extras "
+"menu in your account settings."
 msgstr ""
 
 #. Plugin URI of the plugin/theme

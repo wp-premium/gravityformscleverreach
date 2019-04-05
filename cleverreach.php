@@ -1,15 +1,10 @@
 <?php
 
-// don't load directly
-if ( ! defined( 'ABSPATH' ) ) {
-	die();
-}
-
 /**
 Plugin Name: Gravity Forms CleverReach Add-On
 Plugin URI: https://www.gravityforms.com
 Description: Integrates Gravity Forms with CleverReach, allowing form submissions to be automatically sent to your CleverReach account.
-Version: 1.4
+Version: 1.5
 Author: rocketgenius
 Author URI: https://www.rocketgenius.com
 License: GPL-2.0+
@@ -35,7 +30,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-define( 'GF_CLEVERREACH_VERSION', '1.4' );
+defined( 'ABSPATH' ) or die();
+
+define( 'GF_CLEVERREACH_VERSION', '1.5' );
 
 // If Gravity Forms is loaded, bootstrap the CleverReach Add-On.
 add_action( 'gform_loaded', array( 'GF_CleverReach_Bootstrap', 'load' ), 5 );
@@ -59,7 +56,15 @@ class GF_CleverReach_Bootstrap {
 			return;
 		}
 
-		require_once( 'class-gf-cleverreach.php' );
+		// Get Add-On settings.
+		$settings = get_option( 'gravityformsaddon_gravityformscleverreach_settings', array() );
+
+		// Load legacy Add-On.
+		if ( ! rgar( $settings, 'api_key' ) || ( rgget( 'subview' ) === 'gravityformscleverreach' && rgget( 'page' ) === 'gf_settings' ) ) {
+			require_once( 'class-gf-cleverreach.php' );
+		} else {
+			require_once( 'includes/class-gf-cleverreach-legacy.php' );
+		}
 
 		GFAddOn::register( 'GFCleverReach' );
 

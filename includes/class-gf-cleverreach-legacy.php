@@ -1,6 +1,9 @@
 <?php
 
-defined( 'ABSPATH' ) or die();
+// don't load directly
+if ( ! defined( 'ABSPATH' ) ) {
+	die();
+}
 
 // Load Feed Add-On Framework.
 GFForms::include_feed_addon_framework();
@@ -139,11 +142,11 @@ class GFCleverReach extends GFFeedAddOn {
 	protected $_capabilities = array( 'gravityforms_cleverreach', 'gravityforms_cleverreach_uninstall' );
 
 	/**
-	 * Contains an instance of the CleverReach API library.
+	 * Contains an instance of the CleverReach SoapClient.
 	 *
 	 * @since  1.0
 	 * @access protected
-	 * @var    GF_CleverReach_API $api If available, contains an instance of the CleverReach API library.
+	 * @var    SoapClient $api If available, contains an instance of the CleverReach SoapClient.
 	 */
 	protected $api = null;
 
@@ -164,6 +167,15 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @var    string $api_url The base path to the CleverReach API.
 	 */
 	protected $api_url = 'http://api.cleverreach.com/soap/interface_v5.1.php?wsdl';
+
+	/**
+	 * Defines the custom fields created upon saving a feed.
+	 *
+	 * @since  1.0
+	 * @access protected
+	 * @var    array $_new_custom_fields The custom fields created upon saving a feed.
+	 */
+	protected $_new_custom_fields = array();
 
 	/**
 	 * Get instance of this class.
@@ -196,11 +208,32 @@ class GFCleverReach extends GFFeedAddOn {
 
 		parent::init();
 
+		add_action( 'admin_notices', array( $this, 'display_update_authentication_message' ) );
+
 		$this->add_delayed_payment_support(
 			array(
-				'option_label' => esc_html__( 'Subscribe contact to CleverReach only when payment is received.', 'gravityformscleverreach' ),
+				'option_label' => esc_html__( 'Subscribe contact to CleverReach only when payment is received.', 'gravityformscleverreach' )
 			)
 		);
+
+	}
+
+	/**
+	 * Display update authentication message.
+	 *
+	 * @since  1.5
+	 * @access public
+	 */
+	public function display_update_authentication_message() {
+
+		// Prepare message.
+		$message = sprintf(
+			esc_html__( "CleverReach's SOAP API has been deprecated. %sPlease update your CleverReach credentials to use their current REST API.%s", 'gravityformscleverreach' ),
+			'<a href="' . esc_url( admin_url( 'admin.php?page=gf_settings&subview=gravityformscleverreach' ) ) . '">',
+			'</a>'
+		);
+
+		printf( '<div class="notice notice-error"><p>%s</p></div>', $message );
 
 	}
 
@@ -211,12 +244,51 @@ class GFCleverReach extends GFFeedAddOn {
 	// # PLUGIN SETTINGS -----------------------------------------------------------------------------------------------
 
 	/**
+	 * Display warning message on plugin settings page when SOAP extension is not loaded.
+	 *
+	 * @since  1.0
+	 * @access public
+	 *
+	 * @uses GFAddOn::plugin_settings_icon()
+	 * @uses GFAddOn::plugin_settings_page()
+	 * @uses GFAddOn::plugin_settings_title()
+	 */
+	public function plugin_settings_page() {
+
+		// If the Soap extension is loaded, display the normal settings page.
+		if ( extension_loaded( 'soap' ) ) {
+			return parent::plugin_settings_page();
+		}
+
+		// Get plugin settings icon.
+		$icon = $this->plugin_settings_icon();
+
+		// If no icon is defined, set it a default.
+		if ( empty( $icon ) ) {
+			$icon = '<i class="fa fa-cogs"></i>';
+		}
+
+		// Prepare message.
+		echo sprintf(
+			'<h3><span>%s %s</span></h3><p>%s</p><p>%s</p>',
+			$icon,
+			esc_html( $this->plugin_settings_title() ),
+			sprintf(
+				esc_html__( 'Gravity Forms CleverReach Add-On requires the %sPHP Soap extension%s to be able to communicate with CleverReach.' , 'gravityformscleverreach' ),
+				'<a href="http://php.net/manual/en/book.soap.php">', '</a>'
+			),
+			esc_html__( 'To continue using this Add-On, please enable the Soap extension. For information on doing so, contact your hosting provider.', 'gravityformscleverreach' )
+		);
+
+	}
+
+	/**
 	 * Prepare settings to be rendered on plugin settings tab.
 	 *
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @uses   GFCleverReach::initialize_api()
+	 * @uses GFCleverReach::plugin_settings_description()
 	 *
 	 * @return array
 	 */
@@ -224,45 +296,31 @@ class GFCleverReach extends GFFeedAddOn {
 
 		return array(
 			array(
-				'description' => sprintf(
-					'<p>%s</p>',
-					sprintf(
-						esc_html__( 'CleverReach makes it easy to send email newsletters to your customers, manage your subscriber lists, and track campaign performance. Use Gravity Forms to collect customer information and automatically add it to your CleverReach group. If you don\'t have a CleverReach account, you can %1$ssign up for one here.%2$s', 'gravityformscleverreach' ),
-						'<a href="http://www.cleverreach.com/" target="_blank">', '</a>'
-					)
-				),
+				'description' => $this->plugin_settings_description(),
 				'fields'      => array(
 					array(
-						'name'          => 'apiToken',
-						'type'          => 'hidden',
-						'save_callback' => array( $this, 'save_api_token' ),
+						'name'  => 'clientId',
+						'label' => esc_html__( 'Customer ID', 'gravityformscleverreach' ),
+						'type'  => 'text',
+						'class' => 'medium',
 					),
 					array(
-						'name'              => 'clientId',
-						'label'             => esc_html__( 'Customer ID', 'gravityformscleverreach' ),
-						'type'              => 'text',
-						'class'             => 'medium',
-						'feedback_callback' => array( $this, 'api_feedback_callback' ),
+						'name'  => 'username',
+						'label' => esc_html__( 'Username', 'gravityformscleverreach' ),
+						'type'  => 'text',
+						'class' => 'medium',
 					),
 					array(
-						'name'              => 'username',
-						'label'             => esc_html__( 'Username', 'gravityformscleverreach' ),
-						'type'              => 'text',
-						'class'             => 'medium',
-						'feedback_callback' => array( $this, 'api_feedback_callback' ),
-					),
-					array(
-						'name'              => 'password',
-						'label'             => esc_html__( 'Password', 'gravityformscleverreach' ),
-						'type'              => 'text',
-						'input_type'        => 'password',
-						'class'             => 'medium',
-						'feedback_callback' => array( $this, 'api_feedback_callback' ),
+						'name'       => 'password',
+						'label'      => esc_html__( 'Password', 'gravityformscleverreach' ),
+						'type'       => 'text',
+						'input_type' => 'password',
+						'class'      => 'medium',
 					),
 					array(
 						'type'     => 'save',
 						'messages' => array(
-							'success' => esc_html__( 'CleverReach settings have been updated.', 'gravityformscleverreach' ),
+							'success' => __( 'CleverReach settings have been updated.', 'gravityformscleverreach' ),
 						),
 					),
 				),
@@ -272,84 +330,37 @@ class GFCleverReach extends GFFeedAddOn {
 	}
 
 	/**
-	 * Get API token upon saving plugin settings.
+	 * Prepare plugin settings description.
 	 *
-	 * @since  1.4
+	 * @since  1.0
 	 * @access public
 	 *
-	 * @param array  $field       Field properties.
-	 * @param string $field_value Field value.
+	 * @uses GFCleverReach::initialize_api()
 	 *
-	 * @uses   GFAddOn::get_posted_settings()
-	 * @uses   GFAddOn::get_previous_settings()
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GF_CleverReach_API::authenticate()
-	 *
-	 * @return bool|string
+	 * @return string $description
 	 */
-	public function save_api_token( $field = array(), $field_value = '' ) {
+	public function plugin_settings_description() {
 
-		// Get previous and posted settings.
-		$previous = $this->get_previous_settings();
-		$settings = $this->get_posted_settings();
+		// Prepare base description.
+		$description = sprintf(
+			'<p>%s</p>',
+			sprintf(
+				esc_html__( 'CleverReach makes it easy to send email newsletters to your customers, manage your subscriber lists, and track campaign performance. Use Gravity Forms to collect customer information and automatically add it to your CleverReach group. If you don\'t have a CleverReach account, you can %1$ssign up for one here.%2$s', 'gravityformscleverreach' ),
+				'<a href="http://www.cleverreach.com/" target="_blank">', '</a>'
+			)
+		);
 
-		// If settings did not change, do not update API token.
-		if ( rgar( $previous, 'clientId' ) === rgar( $settings, 'clientId' ) && rgar( $previous, 'username' ) === rgar( $settings, 'username' ) && rgar( $previous, 'password' ) === rgar( $settings, 'password' ) ) {
-			return $field_value;
-		}
+		// If API is not initialized, add message to description about how to get API key.
+		if ( ! $this->initialize_api() ) {
 
-		// Load API library.
-		if ( ! class_exists( 'GF_CleverReach_API' ) ) {
-			require_once 'includes/class-gf-cleverreach-api.php';
-		}
-
-		try {
-
-			// Get token.
-			$token = GF_CleverReach_API::authenticate( $settings['clientId'], $settings['username'], $settings['password'] );
-
-			// Reset API object.
-			$this->api = null;
-
-			return $token;
-
-		} catch ( Exception $e ) {
-
-			// Log that authentication test failed.
-			$this->log_error( __METHOD__ . '(): API credentials are invalid; ' . $e->getMessage() );
-
-			// Reset API object.
-			$this->api = null;
-
-			return 'failed';
+			$description .= sprintf(
+				'<p>%s</p>',
+				esc_html__( 'Gravity Forms CleverReach Add-On requires an API Key, with reading and writing authorization, which can be found on the API page under the Extras menu in your account settings.', 'gravityformscleverreach' )
+			);
 
 		}
 
-	}
-
-	/**
-	 * Provide validation state for API settings.
-	 *
-	 * @since  1.4
-	 * @access public
-	 *
-	 * @uses   GFAddOn::get_plugin_setting()
-	 * @uses   GFCleverReach::initialize_api()
-	 *
-	 * @return bool|null
-	 */
-	public function api_feedback_callback() {
-
-		// Get API token.
-		$api_token = $this->get_plugin_setting( 'apiToken' );
-
-		if ( 'failed' === $api_token ) {
-			return false;
-		} else if ( rgblank( $api_token ) ) {
-			return null;
-		} else {
-			return $this->initialize_api();
-		}
+		return $description;
 
 	}
 
@@ -365,10 +376,10 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @uses   GFAddOn::add_field_after()
-	 * @uses   GFCleverReach::get_custom_fields_field_map()
-	 * @uses   GFCleverReach::get_forms_for_feed_setting()
-	 * @uses   GFCleverReach::get_groups_for_feed_setting()
+	 * @uses GFAddOn::add_field_after()
+	 * @uses GFCleverReach::custom_fields_for_feed_setting()
+	 * @uses GFCleverReach::forms_for_feed_setting()
+	 * @uses GFCleverReach::groups_for_feed_setting()
 	 *
 	 * @return array
 	 */
@@ -379,26 +390,24 @@ class GFCleverReach extends GFFeedAddOn {
 			array(
 				'fields' => array(
 					array(
-						'name'          => 'feed_name',
-						'label'         => esc_html__( 'Feed Name', 'gravityformscleverreach' ),
-						'type'          => 'text',
-						'class'         => 'medium',
-						'required'      => true,
-						'default_value' => $this->get_default_feed_name(),
-						'tooltip'       => sprintf(
+						'name'       => 'feed_name',
+						'label'      => esc_html__( 'Feed Name', 'gravityformscleverreach' ),
+						'type'       => 'text',
+						'required'   => true,
+						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'Name', 'gravityformscleverreach' ),
 							esc_html__( 'Enter a feed name to uniquely identify this setup.', 'gravityformscleverreach' )
 						),
 					),
 					array(
-						'name'     => 'group',
-						'label'    => esc_html__( 'CleverReach Group', 'gravityformscleverreach' ),
-						'type'     => 'select',
-						'required' => true,
-						'choices'  => $this->get_groups_for_feed_setting(),
-						'onchange' => "jQuery(this).parents('form').submit();",
-						'tooltip'  => sprintf(
+						'name'       => 'group',
+						'label'      => esc_html__( 'CleverReach Group', 'gravityformscleverreach' ),
+						'type'       => 'select',
+						'required'   => true,
+						'choices'    => $this->groups_for_feed_setting(),
+						'onchange'   => "jQuery(this).parents('form').submit();",
+						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'CleverReach Group', 'gravityformscleverreach' ),
 							esc_html__( 'Select which CleverReach group this feed will add contacts to.', 'gravityformscleverreach' )
@@ -422,7 +431,7 @@ class GFCleverReach extends GFFeedAddOn {
 						'label'      => esc_html__( 'Custom Fields', 'gravityformscleverreach' ),
 						'type'       => 'dynamic_field_map',
 						'dependency' => 'group',
-						'field_map'  => $this->get_custom_fields_field_map(),
+						'field_map'  => $this->custom_fields_for_feed_setting(),
 						'tooltip'    => sprintf(
 							'<h6>%s</h6>%s',
 							esc_html__( 'Custom Fields', 'gravityformscleverreach' ),
@@ -446,8 +455,9 @@ class GFCleverReach extends GFFeedAddOn {
 			),
 		);
 
+
 		// Get available Double Opt-In forms.
-		$forms = $this->get_forms_for_feed_setting();
+		$forms = $this->forms_for_feed_setting();
 
 		// If less than two forms were found, return.
 		if ( count( $forms ) < 2 ) {
@@ -460,12 +470,12 @@ class GFCleverReach extends GFFeedAddOn {
 			'label'      => esc_html__( 'Double Opt-In Form', 'gravityformscleverreach' ),
 			'type'       => 'select',
 			'dependency' => 'group',
-			'choices'    => $this->get_forms_for_feed_setting(),
+			'choices'    => $this->forms_for_feed_setting(),
 			'tooltip'    => sprintf(
 				'<h6>%s</h6>%s',
 				esc_html__( 'Double Opt-In Form', 'gravityformscleverreach' ),
 				esc_html__( 'Select which CleverReach form will be used when exporting to CleverReach to send the opt-in email.', 'gravityformscleverreach' )
-			),
+			)
 		);
 
 		// Add Double Opt-In field.
@@ -478,41 +488,15 @@ class GFCleverReach extends GFFeedAddOn {
 	/**
 	 * Fork of maybe_save_feed_settings to create new CleverReach custom fields.
 	 *
-	 * @since  1.0
 	 * @access public
-	 *
-	 * @param int $feed_id The ID of the feed being edited.
-	 * @param int $form_id The ID of the current form.
-	 *
-	 * @uses   GFAddOn::current_user_can_any()
-	 * @uses   GFAddOn::filter_settings()
-	 * @uses   GFAddOn::get_posted_settings()
-	 * @uses   GFAddOn::get_save_error_message()
-	 * @uses   GFAddOn::get_save_success_message()
-	 * @uses   GFAddOn::get_slug()
-	 * @uses   GFAddOn::set_previous_settings()
-	 * @uses   GFAddOn::validate_settings()
-	 * @uses   GFCleverReach::create_new_custom_fields()
-	 * @uses   GFCommon::add_error_message()
-	 * @uses   GFCommon::add_message()
-	 * @uses   GFFeedAddOn::get_feed()
-	 * @uses   GFFeedAddOn::get_feed_settings_fields()
-	 * @uses   GFFeedAddOn::save_feed_settings()
-	 * @uses   GFFeedAddOn::trim_conditional_logic_vales()
-	 *
-	 * @return int
+	 * @param int $feed_id - The ID of the feed being edited
+	 * @param int $form_id - The ID of the current form
+	 * @return int $feed_id
 	 */
 	public function maybe_save_feed_settings( $feed_id, $form_id ) {
 
 		// If feed was not saved, return.
 		if ( ! rgpost( 'gform-settings-save' ) ) {
-			return $feed_id;
-		}
-
-		check_admin_referer( $this->get_slug() . '_save_settings', '_' . $this->get_slug() . '_save_settings_nonce' );
-
-		if ( ! $this->current_user_can_any( $this->_capabilities_form_settings ) ) {
-			GFCommon::add_error_message( esc_html__( "You don't have sufficient permissions to update the form settings.", 'gravityforms' ) );
 			return $feed_id;
 		}
 
@@ -532,13 +516,13 @@ class GFCleverReach extends GFFeedAddOn {
 
 		// Validate settings.
 		$is_valid = $this->validate_settings( $sections, $settings );
+		$result   = false;
 
 		// If settings are valid, save.
 		if ( $is_valid ) {
 
 			// Save feed meta.
-			$settings = $this->filter_settings( $sections, $settings );
-			$feed_id  = $this->save_feed_settings( $feed_id, $form_id, $settings );
+			$feed_id = $this->save_feed_settings( $feed_id, $form_id, $settings );
 
 			if ( $feed_id ) {
 				GFCommon::add_message( $this->get_save_success_message( $sections ) );
@@ -553,7 +537,6 @@ class GFCleverReach extends GFFeedAddOn {
 		}
 
 		return $feed_id;
-
 	}
 
 	/**
@@ -562,13 +545,13 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @since  1.1
 	 * @access public
 	 *
-	 * @uses   GFAddOn::get_setting()
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GFCleverReach::initialize_api()
+	 * @uses GFAddOn::get_setting()
+	 * @uses GFAddOn::log_error()
+	 * @uses GFCleverReach::initialize_api()
 	 *
 	 * @return array
 	 */
-	public function get_forms_for_feed_setting() {
+	public function forms_for_feed_setting() {
 
 		// Initialize choices array.
 		$choices = array(
@@ -594,34 +577,33 @@ class GFCleverReach extends GFFeedAddOn {
 		try {
 
 			// Get available CleverReach forms.
-			$forms = $this->api->get_group_forms( $group_id );
+			$forms = $this->api->formsGetList( $this->api_key, $group_id );
+
+			// If no forms were found, return.
+			if ( empty( $forms->data ) ) {
+				return $choices;
+			}
+
+			// Loop through the forms.
+			foreach ( $forms->data as $form ) {
+
+				// Add form as choice.
+				$choices[] = array(
+					'label' => esc_html( $form->name ),
+					'value' => esc_html( $form->id ),
+				);
+
+			}
 
 		} catch ( Exception $e ) {
 
 			// Log that we were unable to retrieve the forms.
-			$this->log_error( __METHOD__ . '(): Unable to retrieve forms for group' . $e->getMessage() );
-
-			return $choices;
-
-		}
-
-		// If no forms were found, return.
-		if ( empty( $forms ) || ! is_array( $forms ) ) {
-			return $choices;
-		}
-
-		// Loop through the forms.
-		foreach ( $forms as $form ) {
-
-			// Add form as choice.
-			$choices[] = array(
-				'label' => esc_html( $form['name'] ),
-				'value' => esc_html( $form['id'] ),
-			);
+			$this->log_error( __METHOD__ . '(): ' . $e->getMessage() );
 
 		}
 
 		return $choices;
+
 
 	}
 
@@ -631,19 +613,19 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GFCleverReach::initialize_api()
+	 * @uses GFAddOn::log_error()
+	 * @uses GFCleverReach::initialize_api()
 	 *
 	 * @return array
 	 */
-	public function get_groups_for_feed_setting() {
+	public function groups_for_feed_setting() {
 
 		// Initialize choices array.
 		$choices = array(
 			array(
 				'label' => __( 'Choose a CleverReach Group', 'gravityformscleverreach' ),
-				'value' => '',
-			),
+				'value' => ''
+			)
 		);
 
 		// If API isn't initialized, return.
@@ -654,7 +636,23 @@ class GFCleverReach extends GFFeedAddOn {
 		try {
 
 			// Get the CleverReach groups.
-			$groups = $this->api->get_groups();
+			$groups = $this->api->groupGetList( $this->api_key );
+
+			// If request failed or no groups were found, return.
+			if ( $groups->statuscode == 1 || ( $groups->statuscode == 0 && empty( $groups->data ) ) ) {
+				return $groups;
+			}
+
+			// Loop through the groups.
+			foreach ( $groups->data as $group ) {
+
+				// Add group as choice.
+				$choices[] = array(
+					'label' => esc_html( $group->name ),
+					'value' => esc_attr( $group->id )
+				);
+
+			}
 
 		} catch ( Exception $e ) {
 
@@ -663,36 +661,19 @@ class GFCleverReach extends GFFeedAddOn {
 
 		}
 
-		// Loop through groups.
-		foreach ( $groups as $group ) {
-
-			// Add group as choice.
-			$choices[] = array(
-				'label' => esc_html( $group['name'] ),
-				'value' => esc_attr( $group['id'] ),
-			);
-
-		}
-
 		return $choices;
 
 	}
 
 	/**
-	 * Prepare CleverReach custom fields for field map feed settings field.
+	 * Prepare CleverReach custom fields for feed settings field.
 	 *
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @uses   Exception::getMessage()
-	 * @uses   GFAddOn::get_setting()
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GFCleverReach::initialize_api()
-	 * @uses   GF_CleverReach_API::get_attributes()
-	 *
-	 * @return array
+	 * @return array - An array of CleverReach custom fields formatted for a select settings field
 	 */
-	public function get_custom_fields_field_map() {
+	public function custom_fields_for_feed_setting() {
 
 		// Get current group ID.
 		$group_id = $this->get_setting( 'group' );
@@ -704,27 +685,23 @@ class GFCleverReach extends GFFeedAddOn {
 
 		try {
 
-			// Get global attributes.
-			$global_attributes = $this->api->get_attributes();
+			// Get the current group.
+			$group = $this->api->groupGetDetails( $this->api_key, $group_id );
+
+			// If request failed, return.
+			if ( in_array( $group->statuscode, array( 1, 20 ) ) ) {
+
+				// Log that group could not be retrieved.
+				$this->log_error( __METHOD__ . '(): Unable to retrieve group.' );
+
+				return array();
+
+			}
 
 		} catch ( Exception $e ) {
 
 			// Log that group could not be retrieved.
-			$this->log_error( __METHOD__ . '(): Unable to retrieve global attributes; ' . $e->getMessage() );
-
-			return array();
-
-		}
-
-		try {
-
-			// Get group attributes.
-			$group_attributes = $this->api->get_attributes( $group_id );
-
-		} catch ( Exception $e ) {
-
-			// Log that group could not be retrieved.
-			$this->log_error( __METHOD__ . '(): Unable to retrieve group attributes; ' . $e->getMessage() );
+			$this->log_error( __METHOD__ . '(): Unable to retrieve group; ' . $e->getMessage() );
 
 			return array();
 
@@ -739,21 +716,47 @@ class GFCleverReach extends GFFeedAddOn {
 		);
 
 		// Merge global and group attributes.
-		$attributes = array_merge( ( is_array( $global_attributes ) ? $global_attributes : array() ), ( is_array( $group_attributes ) ? $group_attributes : array() ) );
+		$attributes = array_merge( $group->data->attributes, $group->data->globalAttributes );
 
-		// If no attributes were found, return.
-		if ( empty( $attributes ) ) {
-			return $choices;
+		// Add attributes as choices.
+		if ( ! empty( $attributes ) ) {
+
+			// Loop through attributes.
+			foreach ( $attributes as $attribute ) {
+
+				// Add attribute as choice.
+				$choices[] = array(
+					'label' => esc_html( $attribute->key ),
+					'value' => esc_attr( $attribute->key ),
+				);
+
+			}
+
 		}
 
-		// Loop through attributes.
-		foreach ( $attributes as $attribute ) {
+		// Add new custom fields.
+		if ( ! empty( $this->_new_custom_fields ) ) {
 
-			// Add attribute as choice.
-			$choices[] = array(
-				'label' => esc_html( $attribute['description'] ),
-				'value' => esc_attr( $attribute['name'] ),
-			);
+			// Loop through new custom fields.
+			foreach ( $this->_new_custom_fields as $new_field ) {
+
+				// Loop through existing choices.
+				foreach ( $choices as $choice ) {
+
+					// If new field is a choice, break.
+					if ( $choice['value'] == $new_field ) {
+						continue 2;
+					}
+
+				}
+
+				// Add new custom field as choice.
+				$choices[] = array(
+					'label' => esc_html( $new_field ),
+					'value' => esc_attr( $new_field ),
+				);
+
+			}
 
 		}
 
@@ -761,7 +764,7 @@ class GFCleverReach extends GFFeedAddOn {
 		if ( count( $choices ) > 0 ) {
 			$choices[] = array(
 				'label' => esc_html__( 'Add Custom Field', 'gravityformscleverreach' ),
-				'value' => 'gf_custom',
+				'value' => 'gf_custom'
 			);
 		}
 
@@ -777,9 +780,9 @@ class GFCleverReach extends GFFeedAddOn {
 	 *
 	 * @param array $settings The posted Feed settings.
 	 *
-	 * @uses   GFAddOn::log_debug()
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GFCleverReach::initialize_api()
+	 * @uses GFAddOn::log_debug()
+	 * @uses GFAddOn::log_error()
+	 * @uses GFCleverReach::initialize_api()
 	 *
 	 * @return array
 	 */
@@ -792,9 +795,6 @@ class GFCleverReach extends GFFeedAddOn {
 			return $settings;
 		}
 
-		// Get group ID.
-		$group_id = rgar( $settings, 'group' );
-
 		// Loop through custom fields.
 		foreach ( $settings['custom_fields'] as $index => &$field ) {
 
@@ -806,7 +806,7 @@ class GFCleverReach extends GFFeedAddOn {
 			try {
 
 				// Add new field.
-				$new_field = $this->api->create_attribute( $field['custom_key'], 'text', $group_id );
+				$new_field = $this->api->groupAttributeAdd( $this->api_key, 0, $field['custom_key'], 'text' );
 
 			} catch ( Exception $e ) {
 
@@ -817,16 +817,31 @@ class GFCleverReach extends GFFeedAddOn {
 
 			}
 
-			// Set custom field key.
-			$field['key']        = $new_field['name'];
-			$field['custom_key'] = '';
+			// Replace key for field with new shortcut name and reset custom key.
+			if ( $new_field->statuscode == 0 ) {
 
-			// Update POST field to ensure front-end display is up-to-date.
-			$_gaddon_posted_settings['custom_fields'][ $index ]['key']        = $new_field['name'];
-			$_gaddon_posted_settings['custom_fields'][ $index ]['custom_key'] = '';
+				// Set custom field key.
+				$field['key']        = $new_field->data;
+				$field['custom_key'] = '';
 
-			// Log that field was created.
-			$this->log_debug( __METHOD__ . "(): New field '{$new_field['name']}' created." );
+				// Update POST field to ensure front-end display is up-to-date.
+				$_gaddon_posted_settings['custom_fields'][ $index ]['key']        = $new_field->data;
+				$_gaddon_posted_settings['custom_fields'][ $index ]['custom_key'] = '';
+
+				// Push to new custom fields array to update the UI.
+				$this->_new_custom_fields[] = $new_field->data;
+
+				// Log that field was created.
+				$this->log_debug( __METHOD__ . "(): New field '{$new_field->data}' created." );
+
+			} else {
+
+				// Log that we were unable to create the custom field.
+				$this->log_error( __METHOD__ . '(): Unable to create custom field.' );
+
+				continue;
+
+			}
 
 		}
 
@@ -835,38 +850,10 @@ class GFCleverReach extends GFFeedAddOn {
 	}
 
 	/**
-	 * Renders and initializes a dynamic field map field based on the $field array whose choices are populated by the fields to be mapped.
-	 * (Forked to force reload of field map options.)
-	 *
-	 * @since  1.5
-	 * @access public
-	 *
-	 * @param array $field Field array containing the configuration options of this field.
-	 * @param bool  $echo  Determines if field contents should automatically be displayed. Defaults to true.
-	 *
-	 * @uses   GFAddOn::is_postback()
-	 * @uses   GFCleverReach::get_custom_fields_field_map()
-	 *
-	 * @return string
-	 */
-	public function settings_dynamic_field_map( $field, $echo = true ) {
-
-		// Refresh field map.
-		if ( 'custom_fields' === $field['name'] && $this->is_postback() ) {
-			$field['field_map'] = $this->get_custom_fields_field_map();
-		}
-
-		return parent::settings_dynamic_field_map( $field, $echo );
-
-	}
-
-	/**
 	 * Set feed creation control.
 	 *
 	 * @since  1.0
 	 * @access public
-	 *
-	 * @uses   GFCleverReach::initialize_api()
 	 *
 	 * @return bool
 	 */
@@ -923,9 +910,7 @@ class GFCleverReach extends GFFeedAddOn {
 	 *
 	 * @param array $feed The current Feed object.
 	 *
-	 * @uses   GFAddOn::log_error()
-	 * @uses   GFCleverReach::initialize_api()
-	 * @uses   GF_CleverReach_API::get_group()
+	 * @uses GFCleverReach::initialize_api()
 	 *
 	 * @return string
 	 */
@@ -936,21 +921,10 @@ class GFCleverReach extends GFFeedAddOn {
 			return esc_html( $feed['meta']['group'] );
 		}
 
-		try {
+		// Get group object.
+		$group = $this->api->groupGetDetails( $this->api_key, $feed['meta']['group'] );
 
-			// Get group.
-			$group = $this->api->get_group( rgars( $feed, 'meta/group' ) );
-
-		} catch ( Exception $e ) {
-
-			// Log that we could not get the group.
-			$this->log_error( __METHOD__ . '(): Unable to retrieve group for feed; ' . $e->getMessage() );
-
-			return esc_html__( 'Group not found', 'gravityformscleverreach' );
-
-		}
-
-		return esc_html( rgar( $group, 'name' ) );
+		return $group->statuscode == 0 ? esc_html( $group->data->name ) : esc_html( $feed['meta']['group'] );
 
 	}
 
@@ -970,58 +944,35 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @param array $entry The current Entry object.
 	 * @param array $form  The current Form object.
 	 *
-	 * @uses   GFAddOn::get_field_value()
-	 * @uses   GFAddOn::log_debug()
-	 * @uses   GFCleverReach::double_optin_contact()
-	 * @uses   GFCleverReach::initialize_api()
-	 * @uses   GF_CleverReach_API::get_attributes()
-	 * @uses   GF_CleverReach_API::get_group_receiver()
-	 * @uses   GF_CleverReach_API::send_form()
-	 * @uses   GF_CleverReach_API::upsert_group_receiver()
-	 * @uses   GFCommon::is_invalid_or_empty_email()
-	 * @uses   GFFeedAddOn::add_feed_error()
-	 *
-	 * @return array
+	 * @uses GFAddOn::get_field_value()
+	 * @uses GFCleverReach::double_optin_contact()
+	 * @uses GFCleverReach::initialize_api()
+	 * @uses GFCommon::is_invalid_or_empty_email()
+	 * @uses GFFeedAddOn::add_feed_error()
 	 */
 	public function process_feed( $feed, $entry, $form ) {
 
 		// If API instance is not initialized, exit.
 		if ( ! $this->initialize_api() ) {
 			$this->add_feed_error( esc_html__( 'Unable to process feed because API was not initialized.', 'gravityformscleverreach' ), $feed, $entry, $form );
-			return $entry;
+			return;
 		}
 
-		// Initialize contact object.
+		// Prepare contact object.
 		$contact = array(
-			'email'             => $this->get_field_value( $form, $entry, $feed['meta']['email'] ),
-			'source'            => esc_html__( 'Gravity Forms CleverReach Add-On', 'gravityformscleverreach' ),
-			'attributes'        => array(),
-			'global_attributes' => array(),
+			'email'      => $this->get_field_value( $form, $entry, $feed['meta']['email'] ),
+			'attributes' => array(),
+			'source'     => esc_html__( 'Gravity Forms CleverReach Add-On', 'gravityformscleverreach' ),
 		);
 
 		// If email is invalid, exit.
 		if ( GFCommon::is_invalid_or_empty_email( $contact['email'] ) ) {
 			$this->add_feed_error( esc_html__( 'Unable to process feed because an invalid email address was provided.', 'gravityformscleverreach' ), $feed, $entry, $form );
-			return $entry;
-		}
-
-		try {
-
-			// Get global attributes.
-			$global_attributes = $this->api->get_attributes();
-
-			// Extract global attribute names.
-			$global_attributes = wp_list_pluck( $global_attributes, 'name' );
-
-		} catch ( Exception $e ) {
-
-			// Log that group could not be retrieved.
-			$this->add_feed_error( 'Unable to retrieve global attributes, ignoring custom fields; ' . $e->getMessage(), $feed, $entry, $form );
-
+			return;
 		}
 
 		// Add custom fields to contact.
-		if ( ! empty( $feed['meta']['custom_fields'] ) && isset( $global_attributes ) ) {
+		if ( ! empty( $feed['meta']['custom_fields'] ) ) {
 
 			// Loop through custom fields.
 			foreach ( $feed['meta']['custom_fields'] as $field ) {
@@ -1040,11 +991,10 @@ class GFCleverReach extends GFFeedAddOn {
 				}
 
 				// Add custom field to contact object.
-				if ( in_array( $field['key'], $global_attributes ) ) {
-					$contact['global_attributes'][ $field['key'] ] = $field_value;
-				} else {
-					$contact['attributes'][ $field['key'] ] = $field_value;
-				}
+				$contact['attributes'][] = array(
+					'key'   => $field['key'],
+					'value' => $field_value
+				);
 
 			}
 
@@ -1052,83 +1002,149 @@ class GFCleverReach extends GFFeedAddOn {
 
 		try {
 
-			// Get existing contact.
-			$existing_contact = $this->api->get_group_receiver( $feed['meta']['group'], $contact['email'] );
+			// Determine if contact already exists.
+			$contact_exists = $this->api->receiverGetByEmail( $this->api_key, $feed['meta']['group'], $contact['email'] );
 
 		} catch ( Exception $e ) {
 
-			// If error was not a "Not Found" error, exit.
-			if ( 404 !== $e->getCode() ) {
+			// Log that we could not determine if contact exists.
+			$this->add_feed_error( esc_html__( 'Unable to determine if contact exists.', 'gravityformscleverreach' ), $feed, $entry, $form );
 
-				// Log that we could not determine if contact exists.
-				$this->add_feed_error( esc_html__( 'Unable to determine if contact exists.', 'gravityformscleverreach' ), $feed, $entry, $form );
-
-				return $entry;
-
-			}
+			return;
 
 		}
 
-		// If contact exists, merge data.
-		if ( isset( $existing_contact ) ) {
+		// If contact exists, update. Otherwise, create.
+		if ( $contact_exists->statuscode == 0 ) {
 
-			// Merge contact data.
-			$contact = array_merge( $existing_contact, $contact );
+			try {
 
-			// Set activation time.
-			if ( rgars( $feed, 'meta/double_optin_form' ) ) {
-				$contact['activated'] = 0;
+				// Update contact.
+				$update_contact = $this->api->receiverUpdate( $this->api_key, $feed['meta']['group'], $contact );
+
+				// If contact could not be updated, exit.
+				if ( $update_contact->statuscode != 0 ) {
+
+					// Log that we could not update contact.
+					$this->add_feed_error( "{$contact['email']} has not been updated; {$update_contact->message}", $feed, $entry, $form );
+
+					return;
+
+				}
+
+				// Log that contact was updated.
+				$this->log_debug( __METHOD__ . "(): {$contact['email']} has been updated." );
+
+			} catch ( Exception $e ) {
+
+				// Log that we could not update contact.
+				$this->add_feed_error( $contact['email'] . ' has not been updated; ' . $e->getMessage(), $feed, $entry, $form );
+
+				return;
+
 			}
-
 
 		} else {
 
-			// Set registered time.
+			// Add registration time to contact object.
 			$contact['registered'] = time();
 
-			// Set activation time.
-			$contact['activated'] = rgars( $feed, 'meta/double_optin_form' ) ? 0 : time();
+			// Add activation time to contact object.
+			if ( ! rgars( $feed, 'meta/double_optin_form' ) ) {
+				$contact['activated'] = time();
+			}
+
+
+			try {
+
+				// Add contact.
+				$add_contact = $this->api->receiverAdd( $this->api_key, $feed['meta']['group'], $contact );
+
+				// If contact could not be added, exit.
+				if ( $update_contact->statuscode != 0 ) {
+
+					// Log that we could not create contact.
+					$this->add_feed_error( "{$contact['email']} has not been created; {$update_contact->message}", $feed, $entry, $form );
+
+					return;
+
+				}
+
+				// Log that contact was created.
+				$this->log_debug( __METHOD__ . "(): {$contact['email']} has been created." );
+
+			} catch ( Exception $e ) {
+
+				// Log that we could not create contact.
+				$this->add_feed_error( $contact['email'] . ' has not been created; ' . $e->getMessage(), $feed, $entry, $form );
+
+				return;
+
+			}
 
 		}
 
-		try {
+		// Send Double Opt-In email.
+		if ( rgars( $feed, 'meta/double_optin_form' ) ) {
+			$this->double_optin_contact( $contact, $feed, $entry, $form );
+		}
 
-			$this->log_debug( __METHOD__ . '(): Contact:' . print_r( $contact, true ) );
+	}
 
-			// Upserting contact.
-			$new_contact = $this->api->upsert_group_receiver( rgars( $feed, 'meta/group' ), $contact );
+	/**
+	 * Send Double Opt-In email to contact.
+	 *
+	 * @since 1.3.3
+	 * @access public
+	 *
+	 * @param mixed $contact The Contact object.
+	 * @param array $feed    The current Feed object.
+	 * @param array $entry   The current Entry object.
+	 * @param array $form  The current Form object.
+	 *
+	 * @uses GFAddOn::log_debug()
+	 * @uses GFFeedAddOn::add_feed_error()
+	 */
+	public function double_optin_contact( $contact, $feed, $entry, $form ) {
 
-			// Log the upserted contact.
-			$this->log_debug( __METHOD__ . '(): Contact added/updated; ' . print_r( $new_contact, true ) );
+		// Initialize POST data array.
+		$post_data = array( 'email:' . $contact['email'] );
 
-		} catch ( Exception $e ) {
+		// Add custom fields to POST data.
+		if ( ! empty( $contact['attributes'] ) ) {
 
-			// Log that we could not upsert contact.
-			$this->add_feed_error( sprintf( esc_html__( 'Unable to add or update contact; %s (%d)', 'gravityformscleverreach' ), $e->getMessage(), $e->getCode() ), $feed, $entry, $form );
+			// Loop through custom fields.
+			foreach ( $contact['attributes'] as $attribute ) {
 
-			return $entry;
+				// Add custom field to POST data.
+				$post_data[] = $attribute['key'] . ':' . $attribute['value'];
+
+			}
 
 		}
 
-		// If we are not sending a double opt-in email, return.
-		if ( ! rgars( $feed, 'meta/double_optin_form' ) ) {
-			return $entry;
-		}
+		// Squash POST data array.
+		$post_data = implode( ',', $post_data );
 
-		// Prepare double opt-in data.
-		$optin_data = array(
+		// Prepare request arguments.
+		$args = array(
 			'user_ip'    => $entry['ip'],
 			'user_agent' => $entry['user_agent'],
 			'referer'    => $entry['source_url'],
+			'postdata'   => $post_data
 		);
 
 		try {
 
-			// Send double opt-in email.
-			$opted_in = $this->api->send_form( rgars( $feed, 'meta/double_optin_form' ), 'activate', $new_contact['email'], $optin_data );
+			// Send Double Opt-In email.
+			$double_optin = $this->api->formsSendActivationMail( $this->api_key, $feed['meta']['double_optin_form'], $contact['email'], $args );
 
-			// Log that double opt-in email was sent.
-			$this->log_debug( __METHOD__ . '(): Double opt-in email sent; ' . print_r( $opted_in, true ) );
+			// Log response.
+			if ( $double_optin->statuscode == 0 ) {
+				$this->log_debug( __METHOD__ . "(): {$contact['email']} was sent a double opt-in email." );
+			} else {
+				$this->add_feed_error( $contact['email'] . ' was not sent a double opt-in email; ' . $double_optin->message, $feed, $entry, $form );
+			}
 
 		} catch ( Exception $e ) {
 
@@ -1150,47 +1166,65 @@ class GFCleverReach extends GFFeedAddOn {
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @uses   GFAddOn::get_plugin_setting()
-	 * @uses   GFAddOn::log_debug()
-	 * @uses   GFAddOn::log_error()
+	 * @uses GFAddOn::get_plugin_settings()
+	 * @uses GFAddOn::log_debug()
+	 * @uses GFAddOn::log_error()
 	 *
 	 * @return bool|null
 	 */
 	public function initialize_api() {
+
+		// If the Soap client is not available, return.
+		if ( ! extension_loaded( 'soap' ) ) {
+			return false;
+		}
 
 		// If the API is already initialized, return.
 		if ( ! is_null( $this->api ) ) {
 			return true;
 		}
 
-		// Get the API token.
-		$api_token = $this->get_plugin_setting( 'apiToken' );
+		// Get the plugin settings.
+		$settings = $this->get_plugin_settings();
 
-		// If API token isempty, return.
-		if ( ! $api_token ) {
+		// If the API key is not set, return.
+		if ( rgblank( $settings['api_key'] ) ) {
 			return null;
-		}
-
-		// Load API library.
-		if ( ! class_exists( 'GF_CleverReach_API' ) ) {
-			require_once 'includes/class-gf-cleverreach-api.php';
 		}
 
 		// Log validation step.
 		$this->log_debug( __METHOD__ . "(): Validating API info." );
 
+		// Setup a new CleverReach API object.
+		$cleverreach = new SoapClient( $this->api_url );
+
 		try {
 
-			// Initialize new API object.
-			$api = new GF_CleverReach_API( $api_token );
+			// Run a test request.
+			$api_test = $cleverreach->clientGetDetails( $settings['api_key'] );
 
-			// Run authentication test.
-			$api->get_groups();
+			// If status code is successful, assign API object to instance.
+			if ( $api_test->statuscode == 0 ) {
 
-			// Assign API object to instance.
-			$this->api = $api;
+				// Assign API object to instance.
+				$this->api = $cleverreach;
 
-			return true;
+				// Assign API Key to instance.
+				$this->api_key = $settings['api_key'];
+
+				// Log that authentication test passed.
+				$this->log_debug( __METHOD__ . '(): API credentials are valid.' );
+
+				return true;
+
+			} else {
+
+				// Log that authentication test failed.
+				$this->log_error( __METHOD__ . '(): API credentials are invalid; ' . $api_test->message );
+
+				return false;
+
+			}
 
 		} catch ( Exception $e ) {
 

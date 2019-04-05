@@ -1,3 +1,7 @@
+# 1.5 | 2019-02-19
+   - Updated Add-On to use CleverReach REST API.
+
+
 # 1.4 | 2018-04-02
    - Added security enhancements.
    - Added Double Opt-In support when updating contact.

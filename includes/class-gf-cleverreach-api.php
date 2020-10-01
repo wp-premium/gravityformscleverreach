@@ -61,8 +61,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function create_attribute( $name = '', $type = 'text', $group_id = null ) {
 
@@ -92,8 +91,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function get_attributes( $group_id = '' ) {
 
@@ -117,8 +115,7 @@ class GF_CleverReach_API {
 	 * @param string $username  CleverReach username.
 	 * @param string $password  CleverReach password.
 	 *
-	 * @return bool
-	 * @throws Exception
+	 * @return bool|WP_Error
 	 */
 	public static function authenticate( $client_id = '', $username = '', $password = '' ) {
 
@@ -134,19 +131,14 @@ class GF_CleverReach_API {
 			'password'  => $password,
 		);
 
-		try {
+		// Authenticate.
+		$token = self::make_request( 'login', $args, 'POST' );
 
-			// Authenticate.
-			$token = self::make_request( 'login', $args, 'POST' );
-
-			return trim( $token, '"' );
-
-		} catch ( Exception $e ) {
-
-			// Throw exception.
-			throw $e;
-
+		if ( is_wp_error( $token ) ) {
+			return $token;
 		}
+
+		return trim( $token, '"' );
 
 	}
 
@@ -169,8 +161,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function send_form( $form_id = '', $type = '', $email = '', $data = '' ) {
 
@@ -198,8 +189,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function add_group_receiver( $group_id = '', $receiver = array() ) {
 
@@ -217,8 +207,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function get_group( $group_id = '' ) {
 
@@ -236,8 +225,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function get_group_forms( $group_id = '' ) {
 
@@ -256,8 +244,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function get_group_receiver( $group_id = '', $receiver_id = '' ) {
 
@@ -273,8 +260,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function get_groups() {
 
@@ -294,8 +280,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function update_group_receiver( $group_id = '', $receiver_id = '', $receiver = array() ) {
 
@@ -314,8 +299,7 @@ class GF_CleverReach_API {
 	 *
 	 * @uses   GF_CleverReach_API::make_request()
 	 *
-	 * @return array
-	 * @throws Exception
+	 * @return array|WP_Error
 	 */
 	public function upsert_group_receiver( $group_id = '', $receiver = array() ) {
 
@@ -340,8 +324,7 @@ class GF_CleverReach_API {
 	 * @param string $method     HTTP method. Defaults to GET.
 	 * @param string $return_key Array key from response to return. Defaults to null (return full response).
 	 *
-	 * @return array|string
-	 * @throws Exception
+	 * @return array|string|WP_Error
 	 */
 	private static function make_request( $action, $options = array(), $method = 'GET', $return_key = null ) {
 
@@ -372,9 +355,8 @@ class GF_CleverReach_API {
 		// Execute request.
 		$response = wp_remote_request( $request_url, $args );
 
-		// If response is an error, throw an Exception.
 		if ( is_wp_error( $response ) ) {
-			throw new Exception( $response->get_error_message() );
+			return $response;
 		}
 
 		// Decode response.
@@ -385,9 +367,8 @@ class GF_CleverReach_API {
 			return $result;
 		}
 
-		// If error object exists, throw an Exception.
 		if ( rgar( $result, 'error' ) ) {
-			throw new Exception( rgars( $result, 'error/message' ), rgars( $result, 'error/code' ) );
+			return new WP_Error( rgars( $result, 'error/code' ), rgars( $result, 'error/message' ) );
 		}
 
 		// If a return key is defined and array item exists, return it.

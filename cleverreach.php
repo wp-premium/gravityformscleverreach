@@ -2,18 +2,17 @@
 
 /**
 Plugin Name: Gravity Forms CleverReach Add-On
-Plugin URI: https://www.gravityforms.com
+Plugin URI: https://gravityforms.com
 Description: Integrates Gravity Forms with CleverReach, allowing form submissions to be automatically sent to your CleverReach account.
-Version: 1.5
-Author: rocketgenius
-Author URI: https://www.rocketgenius.com
+Version: 1.7
+Author: Gravity Forms
+Author URI: https://gravityforms.com
 License: GPL-2.0+
 Text Domain: gravityformscleverreach
 Domain Path: /languages
 
 ------------------------------------------------------------------------
-Copyright 2009 rocketgenius
-last updated: October 20, 2010
+Copyright 2009-2020 Rocketgenius
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,7 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 defined( 'ABSPATH' ) or die();
 
-define( 'GF_CLEVERREACH_VERSION', '1.5' );
+define( 'GF_CLEVERREACH_VERSION', '1.7' );
 
 // If Gravity Forms is loaded, bootstrap the CleverReach Add-On.
 add_action( 'gform_loaded', array( 'GF_CleverReach_Bootstrap', 'load' ), 5 );
